@@ -16,7 +16,7 @@ But there is a solution which bridges the gap between these two approaches by th
 Tailscale is a mesh vpn network which uses wireguard under the hood, but automates the key exchange procedure.
 Please consult the official [tailscale documentation](https://tailscale.com/kb/1151/what-is-tailscale) for a detailed explanation.
 
-## Target Architekture
+## Target Architecture
 
 ![architecture](architecture.drawio.svg)
 
@@ -65,13 +65,18 @@ In order to access the cluster via the vpn, you must modify the kubeconfig to po
 ---
 apiVersion: v1
 clusters:
-    - cluster:
-        certificate-authority-data: <base64 encoded secret>
-        server: https://kubernetes
-      name: my-cluster
+  - cluster:
+      certificate-authority-data: <base64 encoded secret>
+      server: https://kubernetes
+    name: my-cluster
 ...
 ```
 
 ### Enable ACLs which blocks all IPs.
 
 Now you are ready to use your cluster from every device which is part of your tailnet. Therefore you can now block all access to the kubernetes apiserver with the ACL extension.
+
+## Further improvements
+
+Right now the tailscale operator can not be used if a installation of the open source coordination server [headscale](https://github.com/juanfont/headscale) should be used.
+This is currently not an easy task, because headscale does not implement all required API endpoints for the tailscale operator. The details can be found in this [Issue](https://github.com/juanfont/headscale/issues/1202).
