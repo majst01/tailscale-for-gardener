@@ -1,34 +1,33 @@
-# Access the kubernetes apiserver from your tailnet
+# Access the Kubernetes apiserver from your tailnet
 
-If you would like to strengthen the security of your kubernetes cluster even further, this blog post explains how this can be achieved.
+## Overview
 
-The most common way to secure a kubernetes cluster which was created with gardener is to apply ACLs described [here](https://github.com/stackitcloud/gardener-extension-acl),
-or to use [ExposureClass](https://gardener.cloud/docs/gardener/exposureclasses/) which exposes the kubernetes apiserver in a cooporate network which is not exposed to the public internet.
+If you would like to strengthen the security of your Kubernetes cluster even further, this guide post explains how this can be achieved.
 
-Managing the ACL extension becomes fairly difficult with the growing number of participants, especially in a dynamic environment and work from home scenarios.
+The most common way to secure a Kubernetes cluster which was created with Gardener is to apply the ACLs described in the [Gardener ACL Extension](https://github.com/stackitcloud/gardener-extension-acl) repository or to use [ExposureClass](https://gardener.cloud/docs/gardener/exposureclasses/), which exposes the Kubernetes apiserver in a corporate network not exposed to the public internet.
 
-ExposureClass might be not possible because you do not have a cooporate network which is suitable for this purpose.
+However, those solutions are not without their drawbacks. Managing the ACL extension becomes fairly difficult with the growing number of participants, especially in a dynamic environment and work from home scenarios, and using ExposureClass requires you to first have a corporate network suitable for this purpose.
 
-But there is a solution which bridges the gap between these two approaches by the use of a mesh vpn based on the [WireGuard](https://www.wireguard.com/)
+But there is a solution which bridges the gap between these two approaches by the use of a mesh VPN based on [WireGuard](https://www.wireguard.com/)
 
 ## Tailscale
 
-Tailscale is a mesh vpn network which uses wireguard under the hood, but automates the key exchange procedure.
+Tailscale is a mesh VPN network which uses Wireguard under the hood, but automates the key exchange procedure.
 Please consult the official [tailscale documentation](https://tailscale.com/kb/1151/what-is-tailscale) for a detailed explanation.
 
 ## Target Architecture
 
-![architecture](architecture.drawio.svg)
+![architecture](tailscale.drawio.svg)
 
 ### Installation
 
-In order to be able to access the kubernetes apiserver only from a tailscale vpn, we call it tailnet,
+In order to be able to access the Kubernetes apiserver only from a tailscale VPN, you need this steps:
 
-1. Create a tailscale account, ensure [MagicDNS](https://tailscale.com/kb/1081/magicdns?q=magic) is enabled.
-2. Create a OAuth ClientID and Secret [OAuth](https://tailscale.com/kb/1236/kubernetes-operator#prerequisites), don't forget to create the tags mentioned there.
-3. Install the tailscale operator [Operator](https://tailscale.com/kb/1236/kubernetes-operator#installation).
+1. Create a tailscale account and ensure [MagicDNS](https://tailscale.com/kb/1081/magicdns?q=magic) is enabled.
+2. Create an OAuth ClientID and Secret [OAuth ClientID and Secret](https://tailscale.com/kb/1236/kubernetes-operator#prerequisites). Don't forget to create the required tags.
+3. Install the tailscale operator [tailscale operator](https://tailscale.com/kb/1236/kubernetes-operator#installation).
 
-You can check if all went well after the operator installation by running `tailscale status`, the tailscale operator must be seen there:
+If all went well after the operator installation, you should be able to see the tailscale operator by running `tailscale status`:
 
 ```bash
 # tailscale status
@@ -37,17 +36,19 @@ You can check if all went well after the operator installation by running `tails
 ...
 ```
 
-### Expose the kubernetes apiserver
+### Expose the Kubernetes apiserver
 
-Now you are ready to expose the kubernetes apiserver in the tailnet by annotating the service which was created by gardener:
+Now you are ready to expose the Kubernetes apiserver in the tailnet by annotating the service which was created by Gardener:
 
 ```bash
-kubectl annotate -n default kubernetes tailscale.com/expose=true tailscale.com/hostname=kubernetes
+kubectl annotate -n default kubernetes \
+        tailscale.com/expose=true \
+        tailscale.com/hostname=kubernetes
 ```
 
-It is required to `kubernetes` as the hostname, because this is part of the certificate common name of the kubernetes apiserver.
+It is required to `kubernetes` as the hostname, because this is part of the certificate common name of the Kubernetes apiserver.
 
-After annotating the service, it will be exposed in the tailnet and can be shown with `tailscale status`:
+After annotating the service, it will be exposed in the tailnet and can be shown by running `tailscale status`:
 
 ```bash
 # tailscale status
@@ -59,7 +60,7 @@ After annotating the service, it will be exposed in the tailnet and can be shown
 
 ### Modify the kubeconfig
 
-In order to access the cluster via the vpn, you must modify the kubeconfig to point to the kubernetes service exposed in the tailnet, by changing the `server` entry to `https://kubernetes`.
+In order to access the cluster via the VPN, you must modify the kubeconfig to point to the Kubernetes service exposed in the tailnet, by changing the `server` entry to `https://kubernetes`.
 
 ```yaml
 ---
@@ -72,11 +73,20 @@ clusters:
 ...
 ```
 
-### Enable ACLs which blocks all IPs.
+### Enable ACLs to Block All IPs
 
-Now you are ready to use your cluster from every device which is part of your tailnet. Therefore you can now block all access to the kubernetes apiserver with the ACL extension.
+Now you are ready to use your cluster from every device which is part of your tailnet. Therefore you can now block all access to the Kubernetes apiserver with the ACL extension.
 
-## Further improvements
+## Caveats
 
-Right now the tailscale operator can not be used if a installation of the open source coordination server [headscale](https://github.com/juanfont/headscale) should be used.
-This is currently not an easy task, because headscale does not implement all required API endpoints for the tailscale operator. The details can be found in this [Issue](https://github.com/juanfont/headscale/issues/1202).
+### Multiple Kubernetes Clusters
+
+You can actually not join multiple Kubernetes Clusters to join your `tailnet` because the `kubernetes` service in every cluster would overlap.
+
+### Headscale
+
+It is possible to host a tailscale coordination by your own if you do not want to rely on the service tailscale.com offers.
+The [headscale project](https://github.com/juanfont/headscale) is a open source implementation of this.
+
+This works for basic tailscale VPN setups, but not for the tailscale operator described here, because `headscale` does not implement all required API endpoints for the tailscale operator.
+The details can be found in this [Github Issue](https://github.com/juanfont/headscale/issues/1202).
